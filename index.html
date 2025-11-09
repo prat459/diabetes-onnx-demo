@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diabetes Progression Prediction (ONNX Model)</title>
+  <link rel="stylesheet" href="styles_diabetes.css" />
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Diabetes Progression Prediction (ONNX)</h1>
+    <p>
+      This demo runs your trained <strong>PyTorch DL_Net</strong> model (exported to <strong>ONNX</strong>) directly in the browser using <strong>ONNX Runtime Web</strong>.
+      Enter the 10 numeric feature values from the <strong>Diabetes dataset</strong>, separated by commas.
+    </p>
+
+    <textarea id="features" rows="3" placeholder="Example: 0.0381, 0.0507, 0.0617, 0.0219, -0.0440, -0.0348, -0.0434, -0.0026, 0.0199, -0.0176"></textarea>
+
+    <div class="buttons">
+      <button id="predictBtn">Run Prediction</button>
+      <button id="clearBtn" class="secondary">Clear</button>
+    </div>
+
+    <div id="resultBox" class="hidden">
+      <h2>Prediction Result</h2>
+      <p id="output"></p>
+    </div>
+
+    <footer>
+      <p>Deployed with ONNX Runtime Web & GitHub Pages — © 2025 prat459</p>
+    </footer>
+  </div>
+
+  <script>
+    const predictBtn = document.getElementById("predictBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const output = document.getElementById("output");
+    const resultBox = document.getElementById("resultBox");
+    const featuresBox = document.getElementById("features");
+
+    // Prefill example input
+    featuresBox.value = "0.0381, 0.0507, 0.0617, 0.0219, -0.0440, -0.0348, -0.0434, -0.0026, 0.0199, -0.0176";
+
+    clearBtn.addEventListener("click", () => {
+      featuresBox.value = "";
+      resultBox.classList.add("hidden");
+    });
+
+    predictBtn.addEventListener("click", async () => {
+      resultBox.classList.remove("hidden");
+      output.textContent = "Running inference...";
+
+      const inputText = featuresBox.value.trim();
+      if (!inputText) {
+        output.textContent = "Please enter 10 input features.";
+        return;
+      }
+
+      const inputArray = inputText.split(",").map(v => parseFloat(v.trim()));
+      if (inputArray.length !== 10) {
+        output.textContent = `Expected 10 features, got ${inputArray.length}.`;
+        return;
+      }
+      if (inputArray.some(isNaN)) {
+        output.textContent = "Invalid numeric input detected!";
+        return;
+      }
+
+      try {
+        const session = await ort.InferenceSession.create("models/dl_net_diabetes_ort.onnx");
+        const tensor = new ort.Tensor("float32", Float32Array.from(inputArray), [1, 10]);
+        const results = await session.run({ float_input: tensor });
+        const pred = results.variable.data[0];
+        output.innerHTML = `
+          <strong>Predicted Diabetes Progression:</strong> ${pred.toFixed(2)}<br>
+          <em>(Higher value → more severe disease progression)</em>
+        `;
+      } catch (err) {
+        console.error("ONNX Error:", err);
+        output.textContent = "⚠️ Error loading or running ONNX model.";
+      }
+    });
+  </script>
+</body>
+</html>
+
