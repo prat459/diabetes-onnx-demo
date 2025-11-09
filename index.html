@@ -9,7 +9,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Diabetes Progression Prediction (ONNX)</h1>
+    <h1>🩺 Diabetes Progression Prediction (ONNX)</h1>
     <p>
       This demo runs your trained <strong>PyTorch DL_Net</strong> model (exported to <strong>ONNX</strong>) directly in the browser using <strong>ONNX Runtime Web</strong>.
       Enter the 10 numeric feature values from the <strong>Diabetes dataset</strong>, separated by commas.
@@ -25,6 +25,12 @@
     <div id="resultBox" class="hidden">
       <h2>Prediction Result</h2>
       <p id="output"></p>
+
+      <!-- ✅ NEW: Severity Meter -->
+      <div class="meter-container">
+        <div id="meterBar" class="meter-bar"></div>
+      </div>
+      <p id="severityLabel" class="severity-text"></p>
     </div>
 
     <footer>
@@ -38,6 +44,8 @@
     const output = document.getElementById("output");
     const resultBox = document.getElementById("resultBox");
     const featuresBox = document.getElementById("features");
+    const meterBar = document.getElementById("meterBar");
+    const severityLabel = document.getElementById("severityLabel");
 
     // Prefill example input
     featuresBox.value = "0.0381, 0.0507, 0.0617, 0.0219, -0.0440, -0.0348, -0.0434, -0.0026, 0.0199, -0.0176";
@@ -47,9 +55,33 @@
       resultBox.classList.add("hidden");
     });
 
+    function updateSeverity(pred) {
+      // Normalize to 0–350 (dataset range)
+      const clamped = Math.max(25, Math.min(pred, 350));
+      const percentage = ((clamped - 25) / (350 - 25)) * 100;
+      meterBar.style.width = `${percentage}%`;
+
+      // Set color and text label
+      if (pred < 120) {
+        meterBar.style.backgroundColor = "#2ecc71";
+        severityLabel.textContent = "🟢 Mild Progression";
+      } else if (pred < 220) {
+        meterBar.style.backgroundColor = "#f1c40f";
+        severityLabel.textContent = "🟡 Moderate Progression";
+      } else if (pred < 300) {
+        meterBar.style.backgroundColor = "#e67e22";
+        severityLabel.textContent = "🟠 High Progression";
+      } else {
+        meterBar.style.backgroundColor = "#e74c3c";
+        severityLabel.textContent = "🔴 Severe Progression";
+      }
+    }
+
     predictBtn.addEventListener("click", async () => {
       resultBox.classList.remove("hidden");
       output.textContent = "Running inference...";
+      meterBar.style.width = "0%";
+      severityLabel.textContent = "";
 
       const inputText = featuresBox.value.trim();
       if (!inputText) {
@@ -72,10 +104,11 @@
         const tensor = new ort.Tensor("float32", Float32Array.from(inputArray), [1, 10]);
         const results = await session.run({ float_input: tensor });
         const pred = results.variable.data[0];
-        output.innerHTML = `
-          <strong>Predicted Diabetes Progression:</strong> ${pred.toFixed(2)}<br>
-          <em>(Higher value → more severe disease progression)</em>
-        `;
+
+        output.innerHTML = `<strong>Predicted Diabetes Progression:</strong> ${pred.toFixed(2)}<br>
+          <em>(Higher value → more severe disease progression)</em>`;
+
+        updateSeverity(pred);
       } catch (err) {
         console.error("ONNX Error:", err);
         output.textContent = "⚠️ Error loading or running ONNX model.";
@@ -84,4 +117,3 @@
   </script>
 </body>
 </html>
-
